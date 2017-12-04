@@ -16,7 +16,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 fileHandler = logging.FileHandler(
-    "{0}/{1}.log".format('data', 'testlog'))
+    "{0}/{1}.log".format('logs', 'simlog'))
 fileHandler.setFormatter(logFormatter)
 logger.addHandler(fileHandler)
 
@@ -26,19 +26,25 @@ logger.addHandler(consoleHandler)
 
 class MyMQTT(mqtt.Client):
 
-    BROKER_URL = 'vsb.nrt.unabdev.sprint.com'
-    IMA_PORT = 8333
-    CA_CERT_PATH = 'certs/vsbnrtunabdevsprintcom.crt'
-    USER_NAME = 'IMA_OAUTH_ACCESS_TOKEN'
-    PASSWORD = 'ca3e42a6-e782-400f-8622-1b60a3eda59f'
-    PUBLISH_PERIOD = 10  # in seconds
-    PUBLISH_WAIT_PERIOD = 2  # in minutes
+    mqtt_dict = configparser.ConfigParser()
+    mqtt_dict.read('config/mqtt_config.ini')
+
+    BROKER_URL = mqtt_dict['MQTT']['BROKER_URL']
+    IMA_PORT = int(mqtt_dict['MQTT']['IMA_PORT'])
+    CA_CERT_PATH = mqtt_dict['MQTT']['CA_CERT_PATH']
+    USER_NAME = mqtt_dict['MQTT']['USER_NAME']
+    PASSWORD = mqtt_dict['MQTT']['PASSWORD']
+    KEEP_ALIVE = int(mqtt_dict['MQTT']['KEEP_ALIVE'])
+    
+    PUBLISH_PERIOD = int(mqtt_dict['MQTT']['PUBLISH_PERIOD'])
+    PUBLISH_WAIT_PERIOD = int(mqtt_dict['MQTT']['PUBLISH_WAIT_PERIOD'])
+    PUBLISH_QOS = int(mqtt_dict['MQTT']['PUBLISH_QOS'])
 
     def __init__(self, client_id, device_path):
         super().__init__(client_id)
         self.device_path = device_path
         self.vehicle_dict = configparser.ConfigParser()
-        self.vehicle_dict.read('devices/' + device_path + '/config.ini')
+        self.vehicle_dict.read('config/devices/' + device_path + '/config.ini')
         self.serial = self.vehicle_dict['device_info']['serial']
         self.SUBSCRIBE_TOPIC = '/vc/v1/devices/' + self.serial + '/rpc/request'
         self.RESPONSE_TOPIC = '/vc/v1/devices/' + self.serial + '/rpc/response'
@@ -71,9 +77,9 @@ class MyMQTT(mqtt.Client):
         # self.tls_set(ca_certs=self.CA_CERT_PATH)
         self.tls_set(ca_certs=self.CA_CERT_PATH, cert_reqs=ssl.CERT_NONE)
         self.username_pw_set(self.USER_NAME, self.PASSWORD)
-        self.connect(self.BROKER_URL, self.IMA_PORT, 60)
-        self.subscribe(self.SUBSCRIBE_TOPIC, 2)
-        self.subscribe(self.CONTROL_TOPIC, 2)
+        self.connect(self.BROKER_URL, self.IMA_PORT, self.KEEP_ALIVE)
+        self.subscribe(self.SUBSCRIBE_TOPIC, self.PUBLISH_QOS)
+        self.subscribe(self.CONTROL_TOPIC, self.PUBLISH_QOS)
         rc = 0
         while rc == 0:
             rc = self.loop()
@@ -179,7 +185,7 @@ class MessagePublisher:
         self.speed_seed = random.randint(5, 10)
         self.SPEED_LIMIT = 60 #mph
         self.increase_speed = True
-        with open('devices/' + self.mqttc.device_path + '/gps_track_data.csv', newline='') as gps_track_file:
+        with open('config/devices/' + self.mqttc.device_path + '/gps_track_data.csv', newline='') as gps_track_file:
             gps_track_reader = csv.reader(gps_track_file)
             self.gps_track_data = list(gps_track_reader)
             self.row_count = len(self.gps_track_data)
@@ -267,12 +273,8 @@ class MessagePublisher:
             # tps
             payload_dict['tps'] = random.randint(0, 100)
             # lat
-            # payload_dict['lat'] = round(
-            #     random.uniform(38.91, 38.92), 7)
             payload_dict['lat'] = self.gps_track_data[self.row_no][0]
             # lon
-            # payload_dict['lon'] = round(
-            #     random.uniform(-94.65, -94.66), 7)
             payload_dict['lon'] = self.gps_track_data[self.row_no][1]
             self.row_no += 1
             # encoded
