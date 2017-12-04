@@ -169,16 +169,6 @@ class MessageHandler:
             self.mqttc.msg_publisher.publish_data(self.mqttc.RESPONSE_TOPIC,
                                                   json.dumps(publish_dict, ensure_ascii=False))
 
-
-# class VehicleData:
-#     def __init__(self):
-#         self.config = configparser.ConfigParser()
-#         self.config.read('data/jastec_config.ini')
-
-#     def get_config_data(self):
-#         return self.config
-
-
 class MessagePublisher:
     def __init__(self, mqttc):
         self.mqttc = mqttc
@@ -365,3 +355,4 @@ class MessagePublisher:
         trip_info_dict['payload'] = payload_dict
         logger.debug('Publishing trip info data')
         self.publish_telemetry(trip_info_dict)
+        logger.debug(trip_info_dict)
