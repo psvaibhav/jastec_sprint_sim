@@ -34,6 +34,18 @@ class MyMQTT(mqtt.Client):
     PUBLISH_PERIOD = 10  # in seconds
     PUBLISH_WAIT_PERIOD = 2  # in minutes
 
+    def __init__(self, client_id, device_path):
+        super().__init__(client_id)
+        self.device_path = device_path
+        self.vehicle_dict = configparser.ConfigParser()
+        self.vehicle_dict.read('devices/' + device_path + '/config.ini')
+        self.serial = self.vehicle_dict['device_info']['serial']
+        self.SUBSCRIBE_TOPIC = '/vc/v1/devices/' + self.serial + '/rpc/request'
+        self.RESPONSE_TOPIC = '/vc/v1/devices/' + self.serial + '/rpc/response'
+        self.PUBLISH_TOPIC = '/vc/v1/devices/' + self.serial + '/telemetry'
+        self.CONTROL_TOPIC = '/vc/v1/devices/' + self.serial + '/control'
+        self.CONTROL_RESP_TOPIC = '/vc/v1/devices/' + self.serial + '/control/response'
+
     def on_connect(self, mqttc, obj, flags, rc):
         logger.debug('Connection status: [' + str(rc) + ']')
         self.msg_publisher = MessagePublisher(self)
@@ -57,13 +69,6 @@ class MyMQTT(mqtt.Client):
 
     def run(self):
         # self.tls_set(ca_certs=self.CA_CERT_PATH)
-        self.vehicle_dict = VehicleData().get_config_data()
-        self.serial = self.vehicle_dict['device_info']['serial']
-        self.SUBSCRIBE_TOPIC = '/vc/v1/devices/' + self.serial + '/rpc/request'
-        self.RESPONSE_TOPIC = '/vc/v1/devices/' + self.serial + '/rpc/response'
-        self.PUBLISH_TOPIC = '/vc/v1/devices/' + self.serial + '/telemetry'
-        self.CONTROL_TOPIC = '/vc/v1/devices/' + self.serial + '/control'
-        self.CONTROL_RESP_TOPIC = '/vc/v1/devices/' + self.serial + '/control/response'
         self.tls_set(ca_certs=self.CA_CERT_PATH, cert_reqs=ssl.CERT_NONE)
         self.username_pw_set(self.USER_NAME, self.PASSWORD)
         self.connect(self.BROKER_URL, self.IMA_PORT, 60)
@@ -165,13 +170,13 @@ class MessageHandler:
                                                   json.dumps(publish_dict, ensure_ascii=False))
 
 
-class VehicleData:
-    def __init__(self):
-        self.config = configparser.ConfigParser()
-        self.config.read('data/jastec_config.ini')
+# class VehicleData:
+#     def __init__(self):
+#         self.config = configparser.ConfigParser()
+#         self.config.read('data/jastec_config.ini')
 
-    def get_config_data(self):
-        return self.config
+#     def get_config_data(self):
+#         return self.config
 
 
 class MessagePublisher:
@@ -184,7 +189,7 @@ class MessagePublisher:
         self.speed_seed = random.randint(5, 10)
         self.SPEED_LIMIT = 60 #mph
         self.increase_speed = True
-        with open('data/gps_track_data.csv', newline='') as gps_track_file:
+        with open('devices/' + self.mqttc.device_path + '/gps_track_data.csv', newline='') as gps_track_file:
             gps_track_reader = csv.reader(gps_track_file)
             self.gps_track_data = list(gps_track_reader)
             self.row_count = len(self.gps_track_data)
@@ -315,6 +320,7 @@ class MessagePublisher:
             tdr_dict['ts'] = ts
 
             logger.debug('Publishing tdr data')
+            logger.debug(tdr_dict)
             self.publish_telemetry(tdr_dict)
 
     def publish_trip_info(self):
