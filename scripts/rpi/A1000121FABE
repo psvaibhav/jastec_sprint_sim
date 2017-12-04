@@ -1,0 +1,3 @@
+#!/bin/sh
+cd ~/work/jastec_sprint_sim/
+python3.6 jastec_sim_tester.py A1000121FABE
